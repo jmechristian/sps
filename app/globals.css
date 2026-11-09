@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-deep: #071e36;
+  --color-navy: #15345e;
+  --color-ink: #0d3f6e;
+  --color-navy-soft: #1e4a78;
+  --color-orange: #e54926;
+  --color-orange-deep: #c43718;
+  --color-gold: #f4aa00;
+  --color-gold-soft: #f6c15a;
+  --color-cream: #f7f4ef;
+  --color-cream-deep: #ebe4d8;
+  --color-paper: #fffdf9;
+  --font-display: var(--font-raleway), "Raleway", sans-serif;
+  --font-sans: var(--font-montserrat), "Montserrat", sans-serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cream);
+  color: var(--color-deep);
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+::selection {
+  background: #e54926;
+  color: #fff;
+}
+
+.hero-wash {
+  background:
+    radial-gradient(ellipse at 12% 8%, rgba(46, 98, 158, 0.45) 0%, transparent 68%),
+    radial-gradient(ellipse at 88% 4%, rgba(229, 73, 38, 0.28) 0%, transparent 64%),
+    radial-gradient(ellipse at 58% 78%, rgba(244, 170, 0, 0.16) 0%, transparent 62%),
+    #071e36;
+  background-size: 180% 180%;
+  animation: wash 32s ease-in-out infinite;
+}
+
+.hero-bloom {
+  background-color: #f7f4ef;
+  background-image:
+    radial-gradient(ellipse 38rem 26rem at 78% 20rem, rgba(229, 73, 38, 0.5) 0%, rgba(229, 73, 38, 0) 68%),
+    radial-gradient(ellipse 26rem 18rem at 16% 10rem, rgba(90, 160, 220, 0.35) 0%, rgba(90, 160, 220, 0) 70%),
+    radial-gradient(ellipse 150% 46rem at 36% -12rem, #071e36 0%, #071e36 58%, rgba(7, 30, 54, 0) 100%),
+    radial-gradient(
+      ellipse 74% 118rem at 66% 14rem,
+      #071e36 0%,
+      #071e36 36%,
+      #0e3d68 48%,
+      #2c6a9c 58%,
+      #7eabc8 70%,
+      #d5e4ee 86%,
+      #f7f4ef 100%
+    );
+}
+
+.ribbon-track {
+  animation: ribbon 46s linear infinite;
+}
+
+@keyframes wash {
+  0%,
+  100% {
+    background-position: 20% 40%;
+  }
+  50% {
+    background-position: 80% 60%;
+  }
+}
+
+@keyframes ribbon {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .hero-wash,
+  .ribbon-track {
+    animation: none;
+  }
 }
