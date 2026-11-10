@@ -54,7 +54,7 @@ export default async function HomePage() {
           <div className="absolute inset-0">
             <HeroVisual />
           </div>
-          <div className="relative z-10 mx-auto max-w-[82rem] px-5 pt-10 pb-10 lg:pt-14 lg:pb-8">
+          <div className="relative z-10 mx-auto max-w-[82rem] px-5 pt-10 pb-4 lg:pt-14 lg:pb-2">
             <div className="flex min-h-[420px] items-center lg:min-h-[560px]">
               <div className="w-full lg:w-[calc((100%-1.5rem)*1.55/2.55)]">
                 <p className="font-display text-sm font-semibold uppercase tracking-[0.22em] text-gold">

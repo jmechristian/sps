@@ -26,7 +26,7 @@ export function LogoRibbon({ logos }: { logos: RibbonLogo[] }) {
   const loop = [...sequence, ...sequence];
 
   return (
-    <section aria-label="Partner logos" className="relative overflow-hidden py-8">
+    <section aria-label="Partner logos" className="relative z-20 mt-8 overflow-hidden py-4">
       <div className="ribbon-track flex w-max items-center gap-20 pr-20">
         {loop.map((item, index) => (
           <div key={index} className="flex h-12 items-center justify-center">
