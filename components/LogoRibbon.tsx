@@ -21,7 +21,7 @@ function Placeholder({ index }: { index: number }) {
 }
 
 export function LogoRibbon({ logos }: { logos: RibbonLogo[] }) {
-  const sequence = logos.length > 0 ? [...logos] : marks.map((_, index) => index);
+  const sequence: (RibbonLogo | number)[] = logos.length > 0 ? [...logos] : marks.map((_, index) => index);
   while (sequence.length < 8) sequence.push(...sequence);
   const loop = [...sequence, ...sequence];
 
