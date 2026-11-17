@@ -4,17 +4,17 @@ import { RegisterWizard } from "@/components/RegisterWizard";
 
 export const metadata: Metadata = {
   title: "Register",
-  description: "Registration for the Southeastern Packaging Summit is not open yet. Preview the attendee form.",
+  description: "Register for the Southeastern Packaging Summit. $799, with three seats per company and one seat per solution provider.",
 };
 
 export default function RegisterPage() {
   return (
     <>
       <PageHeader
-        eyebrow="Not open yet"
+        eyebrow="April 19–20, 2027"
         title="Register"
-        accent="when seats open."
-        lede="Same four steps attendees will use: who you are, what you need from the room, payment, and confirmation. Submit stays off until pricing and registration are live."
+        accent="for $799."
+        lede="Three registrations per company. Solution providers are limited to one. One coupon per company, and an added seat can be purchased at the full price."
       />
       <div className="mx-auto max-w-4xl px-5 py-20">
         <RegisterWizard />
