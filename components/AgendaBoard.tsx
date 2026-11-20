@@ -9,11 +9,16 @@ const WEEK_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const MONTH_SHORT = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
 
+function weekdayIndex(year: number, month: number, day: number) {
+  const offsets = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+  const adjusted = month < 3 ? year - 1 : year;
+  return (adjusted + Math.floor(adjusted / 4) - Math.floor(adjusted / 100) + Math.floor(adjusted / 400) + offsets[month - 1] + day) % 7;
+}
+
 function calendar(iso: string) {
   const [year, month, day] = iso.slice(0, 10).split("-").map(Number);
   if (!year || !month || !day) return null;
-  const date = new Date(year, month - 1, day);
-  return { year, month, day, weekday: date.getDay() };
+  return { year, month, day, weekday: weekdayIndex(year, month, day) };
 }
 
 function formatDay(iso: string) {
@@ -28,23 +33,17 @@ function formatTab(iso: string) {
   return `${WEEK_SHORT[date.weekday]} ${MONTH_SHORT[date.month - 1]} ${date.day}`;
 }
 
+function formatClock(hours: number, minutes: number) {
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour = hours % 12 || 12;
+  return `${hour}:${String(minutes).padStart(2, "0")} ${period}`;
+}
+
 function formatTime(value: string | null) {
   if (!value) return null;
-  const clock = value.match(/^(\d{1,2}):(\d{2})/);
-  if (clock) {
-    const date = new Date();
-    date.setHours(Number(clock[1]), Number(clock[2]), 0, 0);
-    return date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-  }
-  const parsed = new Date(value);
-  if (!Number.isNaN(parsed.getTime()) && value.includes("T")) {
-    return parsed.toLocaleTimeString("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      timeZone: "America/New_York",
-    });
-  }
-  return value;
+  const clock = value.match(/(?:^|T)(\d{1,2}):(\d{2})/);
+  if (!clock) return value;
+  return formatClock(Number(clock[1]), Number(clock[2]));
 }
 
 function timeRange(session: SessionItem) {
