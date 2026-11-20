@@ -205,6 +205,10 @@ type Raw = {
 
 let configured = false;
 
+export function appsyncClient() {
+  return client();
+}
+
 function client() {
   const endpoint = process.env.NEXT_PUBLIC_AWS_APPSYNC_GRAPHQL_ENDPOINT;
   const apiKey = process.env.NEXT_PUBLIC_AWS_APPSYNC_API_KEY;

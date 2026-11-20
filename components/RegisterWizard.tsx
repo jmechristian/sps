@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { RegistrationCheckout } from "@/components/RegistrationCheckout";
 import { fieldClass, labelClass } from "@/lib/styles";
 
 const steps = ["Contact", "Interests", "Payment", "Confirmation"];
@@ -27,6 +28,8 @@ const attendeeTypes = [
 
 type AttendeeType = (typeof attendeeTypes)[number]["id"];
 
+const otherInterest = "Other";
+
 const interests = [
   "Paper and corrugated",
   "Plastics (e.g. bottles, films, bags, trays, foam)",
@@ -37,6 +40,15 @@ const interests = [
   "3rd party logistics",
   "Co-packaging / co-manufacturing",
   "Small-batch production / pilot plants",
+  "Reusable packaging",
+  "Protective packaging and dunnage",
+  "Returnable packaging and tracking",
+  "Bio-based material",
+  "Testing",
+  "Medical packaging",
+  "Package design prototyping",
+  "Package printing and decoration",
+  otherInterest,
 ];
 
 type FormState = {
@@ -51,6 +63,7 @@ type FormState = {
   solution: string;
   opportunity: string;
   interests: string[];
+  otherInterest: string;
   coupon: string;
   terms: boolean;
 };
@@ -67,6 +80,7 @@ const empty: FormState = {
   solution: "",
   opportunity: "",
   interests: [],
+  otherInterest: "",
   coupon: "",
   terms: false,
 };
@@ -75,6 +89,12 @@ export function RegisterWizard() {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [discountApplied, setDiscountApplied] = useState(false);
+  const [checkingCode, setCheckingCode] = useState(false);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [covered, setCovered] = useState(false);
+  const checkedOut = Boolean(paymentIntentId) || covered;
+  const amountDue = discountApplied ? 0 : price;
 
   const selected = attendeeTypes.find((type) => type.id === form.attendeeType) ?? attendeeTypes[0];
 
@@ -89,12 +109,22 @@ export function RegisterWizard() {
   }
 
   function toggleInterest(value: string) {
-    setForm((current) => ({
-      ...current,
-      interests: current.interests.includes(value)
-        ? current.interests.filter((item) => item !== value)
-        : [...current.interests, value],
-    }));
+    setForm((current) => {
+      const selected = current.interests.includes(value);
+      return {
+        ...current,
+        interests: selected ? current.interests.filter((item) => item !== value) : [...current.interests, value],
+        otherInterest: value === otherInterest && selected ? "" : current.otherInterest,
+      };
+    });
+    if (value === otherInterest) {
+      setErrors((current) => {
+        if (!current.otherInterest) return current;
+        const next = { ...current };
+        delete next.otherInterest;
+        return next;
+      });
+    }
   }
 
   function validate(index: number) {
@@ -113,21 +143,82 @@ export function RegisterWizard() {
       }
       if (form.attendeeType === "sponsor" && !form.solution.trim()) next.solution = "Describe the solution you are bringing.";
     }
-    if (index === 3 && !form.terms) next.terms = "Accept the event terms to continue.";
+    if (index === 1 && form.interests.includes(otherInterest) && !form.otherInterest.trim()) {
+      next.otherInterest = "Describe the other interest.";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
   function continueStep() {
     if (!validate(step)) return;
-    setStep((value) => Math.min(3, value + 1));
+    setStep((value) => Math.min(2, value + 1));
+  }
+
+  function changeCoupon(value: string) {
+    update("coupon", value);
+    if (discountApplied) setDiscountApplied(false);
+    setErrors((current) => {
+      if (!current.coupon) return current;
+      const next = { ...current };
+      delete next.coupon;
+      return next;
+    });
+  }
+
+  async function applyDiscount() {
+    if (checkedOut) return;
+    if (!form.coupon.trim()) {
+      setErrors((current) => ({ ...current, coupon: "Please enter a discount code" }));
+      setDiscountApplied(false);
+      return;
+    }
+    setCheckingCode(true);
+    try {
+      const response = await fetch("/api/discount-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: form.coupon }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setDiscountApplied(false);
+        setErrors((current) => ({ ...current, coupon: data.error || "Invalid discount code" }));
+        return;
+      }
+      setDiscountApplied(true);
+      setForm((current) => ({ ...current, coupon: current.coupon.trim() }));
+      setErrors((current) => {
+        if (!current.coupon) return current;
+        const next = { ...current };
+        delete next.coupon;
+        return next;
+      });
+    } catch {
+      setDiscountApplied(false);
+      setErrors((current) => ({ ...current, coupon: "Could not check that code. Try again." }));
+    } finally {
+      setCheckingCode(false);
+    }
+  }
+
+  function removeDiscount() {
+    if (checkedOut) return;
+    setDiscountApplied(false);
+    update("coupon", "");
+  }
+
+  function requireTerms() {
+    if (form.terms) return true;
+    setErrors((current) => ({ ...current, terms: "Accept the event terms to continue." }));
+    return false;
   }
 
   return (
     <div className="rounded-3xl border border-navy/10 bg-paper p-5 md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-navy/60">Southeastern Packaging Summit</p>
-        <p className="font-display text-3xl font-semibold tracking-tight text-navy">${price}</p>
+        <p className="font-display text-3xl font-semibold tracking-tight text-navy">${amountDue.toLocaleString("en-US")}</p>
       </div>
       <ol className="mt-6 grid gap-2 sm:grid-cols-4">
         {steps.map((label, index) => {
@@ -230,21 +321,104 @@ export function RegisterWizard() {
                 </label>
               ))}
             </div>
+            {form.interests.includes(otherInterest) && (
+              <div className="mt-4">
+                <Field
+                  label="Please describe"
+                  value={form.otherInterest}
+                  error={errors.otherInterest}
+                  onChange={(value) => update("otherInterest", value)}
+                />
+              </div>
+            )}
           </fieldset>
         )}
 
         {step === 2 && (
           <div className="grid gap-5">
             <div className="rounded-2xl bg-cream px-5 py-5">
-              <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-navy/60">Registration</p>
-              <p className="mt-2 font-display text-4xl font-semibold tracking-tight text-navy">${price}</p>
-              <p className="mt-3 text-deep/80">{selected.limit} One coupon per company. An added seat can be purchased at ${price}.</p>
+              <div className="flex items-baseline justify-between gap-4">
+                <p className="text-deep">Registration</p>
+                {discountApplied ? (
+                  <p className="font-display text-2xl font-semibold text-navy">
+                    <span className="mr-3 text-lg font-medium text-navy/40 line-through">${price.toLocaleString("en-US")}</span>
+                    $0
+                  </p>
+                ) : (
+                  <p className="font-display text-2xl font-semibold text-navy">${price.toLocaleString("en-US")}</p>
+                )}
+              </div>
+              {discountApplied && <p className="mt-2 text-base text-navy/70">Discount ({form.coupon})</p>}
+              <div className="mt-4 flex items-baseline justify-between border-t border-navy/10 pt-4">
+                <p className="font-display text-xs font-semibold uppercase tracking-[0.16em] text-navy/60">Total</p>
+                <p className="font-display text-3xl font-semibold tracking-tight text-navy">${amountDue.toLocaleString("en-US")}</p>
+              </div>
+              <p className="mt-3 text-base text-deep/70">{selected.limit}</p>
             </div>
-            <Field label="Coupon code" value={form.coupon} onChange={(value) => update("coupon", value)} />
             <div>
-              <p className={labelClass}>Amount due</p>
-              <p className="font-display text-2xl font-semibold text-navy">${price}</p>
+              <span className={labelClass}>Discount code</span>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={form.coupon}
+                  onChange={(event) => changeCoupon(event.target.value)}
+                  disabled={discountApplied || checkedOut}
+                  placeholder="Enter code"
+                  className={fieldClass}
+                  aria-invalid={Boolean(errors.coupon)}
+                />
+                {discountApplied ? (
+                  <button type="button" onClick={removeDiscount} disabled={checkedOut} className="rounded-full bg-orange px-5 py-3 font-display text-sm font-semibold text-white transition hover:bg-orange-deep disabled:cursor-not-allowed disabled:bg-navy/25">
+                    Remove
+                  </button>
+                ) : (
+                  <button type="button" onClick={applyDiscount} disabled={checkingCode || checkedOut} className="rounded-full bg-navy px-5 py-3 font-display text-sm font-semibold text-cream transition hover:bg-ink disabled:cursor-not-allowed disabled:bg-navy/25">
+                    {checkingCode ? "Checking…" : "Apply"}
+                  </button>
+                )}
+              </div>
+              {errors.coupon && <p className="mt-2 text-base text-orange">{errors.coupon}</p>}
+              {discountApplied && <p className="mt-2 text-base text-navy">Code applied. Registration is $0.</p>}
             </div>
+            <label className="flex items-start gap-3 text-navy/80">
+              <input
+                type="checkbox"
+                checked={form.terms}
+                onChange={(event) => update("terms", event.target.checked)}
+                className="mt-1 accent-orange"
+              />
+              I agree to the event terms.
+            </label>
+            {errors.terms && <p className="text-base text-orange">{errors.terms}</p>}
+            <RegistrationCheckout
+              key={amountDue}
+              amount={amountDue}
+              payer={{
+                firstName: form.firstName,
+                lastName: form.lastName,
+                email: form.email,
+                phone: form.phone,
+                company: form.company,
+                attendeeType: selected.label,
+              }}
+              locked={checkedOut}
+              accepted={form.terms}
+              onNeedTerms={() => {
+                requireTerms();
+              }}
+              onCovered={() => {
+                setCovered(true);
+                setStep(3);
+              }}
+              onPaid={(id) => {
+                setPaymentIntentId(id);
+                setStep(3);
+              }}
+            />
+            {checkedOut && (
+              <button type="button" onClick={() => setStep(3)} className="rounded-full bg-navy px-5 py-3 font-display text-sm font-semibold text-cream">
+                Continue
+              </button>
+            )}
           </div>
         )}
 
@@ -259,16 +433,16 @@ export function RegisterWizard() {
               <Item term="Title" value={form.jobTitle} />
               <Item term="Attendee type" value={selected.label} />
               <Item term="Interests" value={form.interests.join(", ") || "—"} />
-              <Item term="Amount due" value={`$${price}${form.coupon.trim() ? ` · coupon ${form.coupon.trim()}` : ""}`} />
+              {form.interests.includes(otherInterest) && form.otherInterest.trim() && (
+                <Item term="Other interest" value={form.otherInterest.trim()} />
+              )}
+              <Item term="Amount due" value={discountApplied ? `$0 · ${form.coupon}` : `$${price.toLocaleString("en-US")}`} />
+              <Item term="Payment" value={paymentIntentId ? "Card payment received" : covered ? "Covered by discount code" : "Not checked out"} />
             </dl>
             {form.attendeeType === "brand" && form.challenge && <Note label="Packaging challenge" value={form.challenge} />}
             {form.attendeeType !== "brand" && form.solution && <Note label="Solution" value={form.solution} />}
             {form.attendeeType === "provider" && form.opportunity && <Note label="Challenge or buying opportunity" value={form.opportunity} />}
-            <label className="mt-6 flex items-start gap-3 text-navy/80">
-              <input type="checkbox" checked={form.terms} onChange={(event) => update("terms", event.target.checked)} className="mt-1 accent-orange" />
-              I agree to the event terms.
-            </label>
-            {errors.terms && <p className="mt-2 text-base text-orange">{errors.terms}</p>}
+            <p className="mt-6 text-base text-navy/70">The confirmation screen and confirmation email are the next piece. This step does not send them yet.</p>
           </div>
         )}
       </div>
@@ -282,7 +456,7 @@ export function RegisterWizard() {
         >
           Back
         </button>
-        {step < 3 ? (
+        {step < 2 && (
           <button
             type="button"
             onClick={continueStep}
@@ -290,17 +464,8 @@ export function RegisterWizard() {
           >
             Continue
           </button>
-        ) : (
-          <button
-            type="button"
-            disabled
-            className="rounded-full bg-navy/20 px-5 py-3 font-display text-sm font-semibold text-navy/60"
-          >
-            Pay ${price}
-          </button>
         )}
       </div>
-      {step === 3 && <p className="mt-3 text-base text-navy/60">Card checkout is the next piece. This page does not charge a card yet.</p>}
     </div>
   );
 }
