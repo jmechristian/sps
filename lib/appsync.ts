@@ -21,6 +21,21 @@ export type Sponsor = {
   type: string | null;
 };
 
+export type AgendaPerson = {
+  id: string;
+  name: string;
+  company: string | null;
+  title: string | null;
+  photo: string | null;
+  companyLogo: string | null;
+};
+
+export type AgendaSponsor = {
+  id: string;
+  name: string;
+  logo: string | null;
+};
+
 export type SessionItem = {
   id: string;
   title: string;
@@ -29,6 +44,8 @@ export type SessionItem = {
   startTime: string | null;
   endTime: string | null;
   location: string | null;
+  speakers: AgendaPerson[];
+  sponsors: AgendaSponsor[];
   preview?: boolean;
 };
 
@@ -47,6 +64,40 @@ const QUERY = /* GraphQL */ `
             endTime
             location
             draft
+            speakerOrder
+            speakers {
+              items {
+                aPSSpeaker {
+                  id
+                  profile {
+                    firstName
+                    lastName
+                    company
+                    jobTitle
+                    profilePicture
+                    user {
+                      registrant {
+                        company {
+                          name
+                          logo
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            sponsors {
+              items {
+                apsSponsor {
+                  id
+                  company {
+                    name
+                    logo
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -93,6 +144,34 @@ type Raw = {
           endTime?: string | null;
           location?: string | null;
           draft?: boolean | null;
+          speakerOrder?: Array<string | null> | null;
+          speakers?: {
+            items?: Array<{
+              aPSSpeaker?: {
+                id: string;
+                profile?: {
+                  firstName?: string | null;
+                  lastName?: string | null;
+                  company?: string | null;
+                  jobTitle?: string | null;
+                  profilePicture?: string | null;
+                  user?: {
+                    registrant?: {
+                      company?: { name?: string | null; logo?: string | null } | null;
+                    } | null;
+                  } | null;
+                } | null;
+              } | null;
+            } | null> | null;
+          } | null;
+          sponsors?: {
+            items?: Array<{
+              apsSponsor?: {
+                id: string;
+                company?: { name?: string | null; logo?: string | null } | null;
+              } | null;
+            } | null> | null;
+          } | null;
         } | null> | null;
       } | null;
     } | null> | null;
@@ -151,6 +230,15 @@ function httpUrl(value: string | null | undefined) {
   return value.startsWith("http") ? value : null;
 }
 
+function mediaUrl(value: string | null | undefined) {
+  if (!value) return null;
+  if (value.startsWith("http://") || value.startsWith("https://")) return value;
+  const base =
+    process.env.NEXT_PUBLIC_S3_PUBLIC_URL ||
+    "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public";
+  return `${base}/${value.replace(/^\//, "")}`;
+}
+
 export async function getEventContent() {
   "use cache";
   cacheLife("minutes");
@@ -170,15 +258,55 @@ export async function getEventContent() {
     const sessions = (data.apsAgendaByEventId?.items ?? [])
       .flatMap((agenda) => agenda?.items?.items ?? [])
       .filter((item): item is NonNullable<typeof item> => Boolean(item && item.draft !== true && item.date && item.title))
-      .map((item) => ({
-        id: item.id,
-        title: item.title || "Session",
-        description: item.description ?? null,
-        date: (item.date || "").slice(0, 10),
-        startTime: item.startTime ?? null,
-        endTime: item.endTime ?? null,
-        location: item.location ?? null,
-      }))
+      .map((item) => {
+        const people = (item.speakers?.items ?? [])
+          .map((entry) => {
+            const speaker = entry?.aPSSpeaker;
+            const profile = speaker?.profile;
+            if (!speaker || !profile) return null;
+            const companyRecord = profile.user?.registrant?.company;
+            const name = [profile.firstName, profile.lastName].filter(Boolean).join(" ");
+            return {
+              id: speaker.id,
+              name: name || "Speaker",
+              company: companyRecord?.name || profile.company || null,
+              title: profile.jobTitle ?? null,
+              photo: mediaUrl(profile.profilePicture),
+              companyLogo: mediaUrl(companyRecord?.logo),
+            };
+          })
+          .filter((person): person is NonNullable<typeof person> => Boolean(person));
+        const order = (item.speakerOrder ?? []).filter((id): id is string => Boolean(id));
+        const speakers = order.length
+          ? [...people].sort((a, b) => {
+              const aRank = order.indexOf(a.id);
+              const bRank = order.indexOf(b.id);
+              if (aRank < 0 && bRank < 0) return 0;
+              if (aRank < 0) return 1;
+              if (bRank < 0) return -1;
+              return aRank - bRank;
+            })
+          : people;
+        const sponsors = (item.sponsors?.items ?? [])
+          .map((entry) => {
+            const sponsor = entry?.apsSponsor;
+            const name = sponsor?.company?.name;
+            if (!sponsor || !name) return null;
+            return { id: sponsor.id, name, logo: mediaUrl(sponsor.company?.logo) };
+          })
+          .filter((sponsor): sponsor is NonNullable<typeof sponsor> => Boolean(sponsor));
+        return {
+          id: item.id,
+          title: item.title || "Session",
+          description: item.description ?? null,
+          date: (item.date || "").slice(0, 10),
+          startTime: item.startTime ?? null,
+          endTime: item.endTime ?? null,
+          location: item.location ?? null,
+          speakers,
+          sponsors,
+        };
+      })
       .sort((a, b) => (a.date + (a.startTime || "")).localeCompare(b.date + (b.startTime || "")));
 
     const speakers = (data.aPSSpeakersByEventId?.items ?? [])

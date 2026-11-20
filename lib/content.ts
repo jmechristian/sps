@@ -178,6 +178,8 @@ export const previewSessions = [
     startTime: null,
     endTime: null,
     location: "Madren Conference Center",
+    speakers: [],
+    sponsors: [],
     preview: true,
   },
   {
@@ -189,6 +191,8 @@ export const previewSessions = [
     startTime: null,
     endTime: null,
     location: "Madren Conference Center",
+    speakers: [],
+    sponsors: [],
     preview: true,
   },
   {
@@ -200,6 +204,8 @@ export const previewSessions = [
     startTime: null,
     endTime: null,
     location: "Packaging Labs",
+    speakers: [],
+    sponsors: [],
     preview: true,
   },
 ];

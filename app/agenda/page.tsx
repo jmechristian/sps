@@ -18,8 +18,8 @@ export default async function AgendaPage() {
       <PageHeader
         eyebrow="April 19–20, 2027"
         title="Agenda"
-        accent="for the working day."
-        lede="A cocktail reception, then one day of sessions and Packaging Labs. Published sessions from this event replace the preview as soon as they are scheduled."
+        accent="for both days."
+        lede="Reception and tours on April 19, then the working summit on April 20. Sessions below are the published agenda. All times are Eastern."
       />
       <div className="mx-auto max-w-6xl px-5 py-20">
         <AgendaBoard sessions={published ? sessions : previewSessions} preview={!published} />
