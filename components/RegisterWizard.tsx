@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { RegistrationCheckout } from "@/components/RegistrationCheckout";
 import { fieldClass, labelClass } from "@/lib/styles";
 
@@ -93,6 +93,10 @@ export function RegisterWizard() {
   const [checkingCode, setCheckingCode] = useState(false);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [covered, setCovered] = useState(false);
+  const [registrantId, setRegistrantId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const savingRef = useRef(false);
   const checkedOut = Boolean(paymentIntentId) || covered;
   const amountDue = discountApplied ? 0 : price;
 
@@ -212,6 +216,45 @@ export function RegisterWizard() {
     if (form.terms) return true;
     setErrors((current) => ({ ...current, terms: "Accept the event terms to continue." }));
     return false;
+  }
+
+  async function completeRegistration(intentId: string | null) {
+    if (savingRef.current || registrantId) return;
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const response = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.email,
+          phone: form.phone,
+          company: form.company,
+          jobTitle: form.jobTitle,
+          attendeeType: form.attendeeType,
+          challenge: form.challenge,
+          solution: form.solution,
+          opportunity: form.opportunity,
+          interests: form.interests,
+          otherInterest: form.otherInterest,
+          coupon: discountApplied ? form.coupon : "",
+          terms: form.terms,
+          paymentIntentId: intentId,
+        }),
+      });
+      const data = (await response.json()) as { id?: string; error?: string };
+      if (!response.ok || !data.id) throw new Error(data.error || "Could not save the registration.");
+      setRegistrantId(data.id);
+      setStep(3);
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Could not save the registration.");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
 
   return (
@@ -407,43 +450,34 @@ export function RegisterWizard() {
               }}
               onCovered={() => {
                 setCovered(true);
-                setStep(3);
+                void completeRegistration(null);
               }}
               onPaid={(id) => {
                 setPaymentIntentId(id);
-                setStep(3);
+                void completeRegistration(id);
               }}
             />
-            {checkedOut && (
-              <button type="button" onClick={() => setStep(3)} className="rounded-full bg-navy px-5 py-3 font-display text-sm font-semibold text-cream">
-                Continue
+            {saveError && <p className="text-base text-orange">{saveError}</p>}
+            {checkedOut && !registrantId && (
+              <button type="button" onClick={() => void completeRegistration(paymentIntentId)} disabled={saving} className="rounded-full bg-navy px-5 py-3 font-display text-sm font-semibold text-cream disabled:bg-navy/25">
+                {saving ? "Saving registration…" : "Save registration"}
               </button>
             )}
           </div>
         )}
 
-        {step === 3 && (
-          <div>
-            <h2 className="font-display text-2xl font-semibold tracking-tight">Review</h2>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Item term="Name" value={`${form.firstName} ${form.lastName}`.trim()} />
-              <Item term="Email" value={form.email} />
-              <Item term="Phone" value={form.phone} />
-              <Item term="Company" value={form.company} />
-              <Item term="Title" value={form.jobTitle} />
-              <Item term="Attendee type" value={selected.label} />
-              <Item term="Interests" value={form.interests.join(", ") || "—"} />
-              {form.interests.includes(otherInterest) && form.otherInterest.trim() && (
-                <Item term="Other interest" value={form.otherInterest.trim()} />
-              )}
-              <Item term="Amount due" value={discountApplied ? `$0 · ${form.coupon}` : `$${price.toLocaleString("en-US")}`} />
-              <Item term="Payment" value={paymentIntentId ? "Card payment received" : covered ? "Covered by discount code" : "Not checked out"} />
-            </dl>
-            {form.attendeeType === "brand" && form.challenge && <Note label="Packaging challenge" value={form.challenge} />}
-            {form.attendeeType !== "brand" && form.solution && <Note label="Solution" value={form.solution} />}
-            {form.attendeeType === "provider" && form.opportunity && <Note label="Challenge or buying opportunity" value={form.opportunity} />}
-            <p className="mt-6 text-base text-navy/70">The confirmation screen and confirmation email are the next piece. This step does not send them yet.</p>
-          </div>
+        {step === 3 && registrantId && (
+          <Confirmation
+            registrantId={registrantId}
+            name={`${form.firstName} ${form.lastName}`.trim()}
+            email={form.email}
+            phone={form.phone}
+            company={form.company}
+            jobTitle={form.jobTitle}
+            attendee={selected.label}
+            discountCode={discountApplied ? form.coupon : ""}
+            amountDue={amountDue}
+          />
         )}
       </div>
 
@@ -451,7 +485,7 @@ export function RegisterWizard() {
         <button
           type="button"
           onClick={() => setStep((value) => Math.max(0, value - 1))}
-          disabled={step === 0}
+          disabled={step === 0 || Boolean(registrantId)}
           className="rounded-full px-4 py-2 font-display text-sm font-semibold text-navy transition hover:text-orange disabled:cursor-not-allowed disabled:text-navy/30"
         >
           Back
@@ -514,20 +548,95 @@ function TextArea({
   );
 }
 
-function Item({ term, value }: { term: string; value: string }) {
+function Confirmation({
+  registrantId,
+  name,
+  email,
+  phone,
+  company,
+  jobTitle,
+  attendee,
+  discountCode,
+  amountDue,
+}: {
+  registrantId: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  jobTitle: string;
+  attendee: string;
+  discountCode: string;
+  amountDue: number;
+}) {
+  const registrationLabel = attendee === "Sponsor" ? "Sponsor registration" : attendee === "Solution provider" ? "Solution provider registration" : "General registration";
   return (
-    <div>
-      <dt className="font-display text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-navy/60">{term}</dt>
-      <dd className="text-deep">{value}</dd>
-    </div>
-  );
-}
-
-function Note({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="mt-4">
-      <p className="font-display text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-navy/60">{label}</p>
-      <p className="text-deep">{value}</p>
+    <div className="grid gap-5">
+      <div className="flex flex-col gap-6 rounded-3xl bg-deep px-6 py-8 text-cream md:flex-row md:items-center md:justify-between md:px-8">
+        <div>
+          <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">Registration complete</h2>
+          <p className="mt-2 font-display text-xs font-semibold uppercase tracking-[0.16em] text-gold">Southeastern Packaging Summit · April 19–20, 2027</p>
+          <p className="mt-3 max-w-xl text-cream/80">Your registration is confirmed. The receipt is below, and your dashboard has the same details.</p>
+        </div>
+        <div className="flex w-full max-w-xs flex-col gap-3">
+          <Link href={`/registrants/${registrantId}`} className="rounded-full bg-orange px-5 py-3 text-center font-display text-sm font-semibold text-white hover:bg-orange-deep">
+            View registrant dashboard
+          </Link>
+          <button type="button" onClick={() => window.print()} className="rounded-full border border-cream/30 px-5 py-3 font-display text-sm font-semibold text-cream hover:border-gold hover:text-gold">
+            Print invoice
+          </button>
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-3xl border border-navy/10">
+        <div className="flex items-start justify-between gap-4 border-b border-navy/10 px-6 py-4">
+          <div>
+            <h3 className="font-display text-xl font-semibold text-deep">Registration invoice</h3>
+            <p className="text-base text-navy/60">Southeastern Packaging Summit · April 19–20, 2027</p>
+          </div>
+          <p className="font-display text-xs text-navy/50">#{registrantId}</p>
+        </div>
+        <div className="grid gap-8 px-6 py-6 lg:grid-cols-3">
+          <div>
+            <h4 className="font-display text-sm font-semibold text-deep">Registrant</h4>
+            <div className="mt-2 space-y-1 text-base text-deep/80">
+              <p className="font-semibold text-deep">{name}</p>
+              <p>{email}</p>
+              <p>{company}</p>
+              <p>{jobTitle}</p>
+              <p>{phone}</p>
+              <p><span className="font-semibold text-deep">Type:</span> {attendee}</p>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <h4 className="font-display text-sm font-semibold text-deep">Itemized charges</h4>
+            <div className="mt-3 overflow-hidden rounded-2xl border border-navy/10">
+              <div className="grid grid-cols-12 gap-2 bg-cream px-4 py-2 font-display text-xs font-semibold uppercase tracking-[0.12em] text-navy/55">
+                <span className="col-span-7">Description</span>
+                <span className="col-span-2 text-right">Qty</span>
+                <span className="col-span-3 text-right">Amount</span>
+              </div>
+              <div className="grid grid-cols-12 gap-2 border-t border-navy/10 px-4 py-3 text-base">
+                <span className="col-span-7">{registrationLabel} – {name}</span>
+                <span className="col-span-2 text-right">1</span>
+                <span className="col-span-3 text-right">${price}</span>
+              </div>
+              <div className="space-y-1 border-t border-navy/10 bg-cream px-4 py-3 text-base">
+                <div className="flex justify-between"><span>Subtotal</span><span>${price}</span></div>
+                {discountCode && (
+                  <div className="flex justify-between">
+                    <span>Discount ({discountCode})</span>
+                    <span>-${price}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-navy/10 pt-2 font-semibold text-deep">
+                  <span>Total due</span>
+                  <span>${amountDue}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -30,7 +30,9 @@ export function normalizeDiscountCode(code: string) {
     .toLowerCase();
 }
 
-export async function checkDiscountCode(raw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+type DiscountMatch = { id: string; code: string; limit: number | null; used: number };
+
+async function findDiscountCode(raw: string): Promise<{ ok: true; match: DiscountMatch } | { ok: false; error: string }> {
   const normalized = normalizeDiscountCode(raw);
   if (!normalized) return { ok: false, error: "Please enter a discount code" };
 
@@ -52,7 +54,7 @@ export async function checkDiscountCode(raw: string): Promise<{ ok: true } | { o
         if (match.limit != null && used + 1 > match.limit) {
           return { ok: false, error: `This code has reached its usage limit (${used}/${match.limit} used)` };
         }
-        return { ok: true };
+        return { ok: true, match: { id: match.id, code: match.code || raw.trim(), limit: match.limit ?? null, used } };
       }
       nextToken = page?.nextToken || null;
     } while (nextToken);
@@ -62,4 +64,54 @@ export async function checkDiscountCode(raw: string): Promise<{ ok: true } | { o
     console.error("SPS discount code lookup failed", error);
     return { ok: false, error: "Could not check that code. Try again." };
   }
+}
+
+export async function checkDiscountCode(raw: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  const found = await findDiscountCode(raw);
+  if (!found.ok) return found;
+  return { ok: true };
+}
+
+const CODE_READ = /* GraphQL */ `
+  query GetSPSCode($id: ID!) {
+    getAPSCode(id: $id) {
+      id
+      used
+      limit
+    }
+  }
+`;
+
+const CODE_UPDATE = /* GraphQL */ `
+  mutation UseSPSCode($input: UpdateAPSCodeInput!) {
+    updateAPSCode(input: $input) {
+      id
+      used
+    }
+  }
+`;
+
+export async function consumeDiscountCode(raw: string) {
+  const found = await findDiscountCode(raw);
+  if (!found.ok) return found;
+  const api = appsyncClient();
+  if (!api) return { ok: false as const, error: "Discount codes are unavailable right now." };
+
+  const latest = (await api.graphql({
+    query: CODE_READ,
+    variables: { id: found.match.id },
+    authMode: "apiKey",
+  })) as { data?: { getAPSCode?: { id: string; used?: number | null; limit?: number | null } | null } };
+  const code = latest.data?.getAPSCode;
+  if (!code?.id) return { ok: false as const, error: "Invalid discount code" };
+  const used = code.used || 0;
+  if (code.limit != null && used + 1 > code.limit) {
+    return { ok: false as const, error: `This code has reached its usage limit (${used}/${code.limit} used)` };
+  }
+  await api.graphql({
+    query: CODE_UPDATE,
+    variables: { input: { id: code.id, used: used + 1 } },
+    authMode: "apiKey",
+  });
+  return { ok: true as const, code: found.match.code };
 }
