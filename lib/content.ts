@@ -2,22 +2,22 @@ export const differentiators = [
   {
     title: "Bring the real problem",
     body: "Show up with a packaging challenge or an innovation you can describe in specs, not slogans.",
-    image: "01.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/real-solutions.png",
   },
   {
     title: "Meet the right counterpart",
     body: "Southeastern companies sit with southeastern packaging providers who can actually do the work.",
-    image: "02.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/02counterpart.png",
   },
   {
     title: "Get into the lab",
     body: "Hands-on Packaging Labs, so a conversation can turn into a trial instead of a follow-up deck.",
-    image: "03.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/03labs.png",
   },
   {
     title: "Leave with a plan",
     body: "You walk out with a custom plan for the packaging goal you came in with.",
-    image: "04.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/04solution.png",
   },
 ] as const;
 

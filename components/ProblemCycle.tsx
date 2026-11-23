@@ -45,7 +45,7 @@ export function ProblemCycle({ steps }: { steps: ProblemStep[] }) {
             transition={{ duration: reduce ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
           >
             {step.image ? (
-              <Image src={step.image} alt="" fill className="object-cover" sizes="352px" />
+              <Image src={step.image} alt={step.title} fill className="object-cover" sizes="352px" />
             ) : (
               <div className="absolute inset-0 bg-[linear-gradient(145deg,#071e36_0%,#15345e_55%,#e54926_150%)]">
                 <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(247,244,239,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(247,244,239,0.2)_1px,transparent_1px)] [background-size:28px_28px]" />
