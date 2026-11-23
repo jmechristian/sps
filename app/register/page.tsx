@@ -16,7 +16,7 @@ export default function RegisterPage() {
         accent="for $799."
         lede="Three registrations per company. Solution providers are limited to one. One coupon per company, and an added seat can be purchased at the full price."
       />
-      <div className="mx-auto max-w-4xl px-5 py-20">
+      <div className="mx-auto max-w-6xl px-5 py-20">
         <RegisterWizard />
       </div>
     </>

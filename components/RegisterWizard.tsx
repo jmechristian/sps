@@ -5,6 +5,8 @@ import { useRef, useState } from "react";
 import { RegistrationCheckout } from "@/components/RegistrationCheckout";
 import { fieldClass, labelClass } from "@/lib/styles";
 
+const formFieldClass = fieldClass.replace("text-xl", "text-lg");
+
 const steps = ["Contact", "Interests", "Payment", "Confirmation"];
 const price = 799;
 
@@ -258,7 +260,7 @@ export function RegisterWizard() {
   }
 
   return (
-    <div className="rounded-3xl border border-navy/10 bg-paper p-5 md:p-8">
+    <div className="rounded-3xl border border-navy/10 bg-paper p-5 text-lg md:p-8">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="font-display text-sm font-semibold uppercase tracking-[0.16em] text-navy/60">Southeastern Packaging Summit</p>
         <p className="font-display text-3xl font-semibold tracking-tight text-navy">${amountDue.toLocaleString("en-US")}</p>
@@ -406,7 +408,7 @@ export function RegisterWizard() {
                   onChange={(event) => changeCoupon(event.target.value)}
                   disabled={discountApplied || checkedOut}
                   placeholder="Enter code"
-                  className={fieldClass}
+                  className={formFieldClass}
                   aria-invalid={Boolean(errors.coupon)}
                 />
                 {discountApplied ? (
@@ -521,7 +523,7 @@ function Field({
   return (
     <label htmlFor={id}>
       <span className={labelClass}>{label}</span>
-      <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass} aria-invalid={Boolean(error)} />
+      <input id={id} type={type} value={value} onChange={(event) => onChange(event.target.value)} className={formFieldClass} aria-invalid={Boolean(error)} />
       {error && <span className="mt-2 block text-base text-orange">{error}</span>}
     </label>
   );
@@ -542,7 +544,7 @@ function TextArea({
   return (
     <label htmlFor={id} className="md:col-span-2">
       <span className={labelClass}>{label}</span>
-      <textarea id={id} rows={4} value={value} onChange={(event) => onChange(event.target.value)} className={fieldClass} aria-invalid={Boolean(error)} />
+      <textarea id={id} rows={4} value={value} onChange={(event) => onChange(event.target.value)} className={formFieldClass} aria-invalid={Boolean(error)} />
       {error && <span className="mt-2 block text-base text-orange">{error}</span>}
     </label>
   );
