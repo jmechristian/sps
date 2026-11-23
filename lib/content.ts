@@ -2,18 +2,22 @@ export const differentiators = [
   {
     title: "Bring the real problem",
     body: "Show up with a packaging challenge or an innovation you can describe in specs, not slogans.",
+    image: "01.jpg",
   },
   {
     title: "Meet the right counterpart",
     body: "Southeastern companies sit with southeastern packaging providers who can actually do the work.",
+    image: "02.jpg",
   },
   {
     title: "Get into the lab",
     body: "Hands-on Packaging Labs, so a conversation can turn into a trial instead of a follow-up deck.",
+    image: "03.jpg",
   },
   {
     title: "Leave with a plan",
     body: "You walk out with a custom plan for the packaging goal you came in with.",
+    image: "04.jpg",
   },
 ] as const;
 
@@ -38,37 +42,37 @@ export const audiences = [
 export const pillars = [
   {
     title: "Expert speakers",
-    image: "speakers.jpg",
-    label: "Speaker photography",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/expert-speakers.png",
+    label: "Expert speakers",
     body: "People who have run the problem, not a tour of the category.",
   },
   {
     title: "Real brands",
-    image: "brands.jpg",
-    label: "Brand and supplier photography",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/real-brands.png",
+    label: "Real brands",
     body: "Southeastern companies and the providers who package for them.",
   },
   {
     title: "Packaging innovations",
-    image: "labs.jpg",
-    label: "Packaging lab photography",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/packaging-labs.png",
+    label: "Packaging innovations",
     body: "Labs, materials, and formats you can inspect up close.",
   },
 ] as const;
 
 export const venueShots = [
   {
-    image: "exterior.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/arial-pic.JPG",
     label: "Madren exterior",
     caption: "Madren Conference Center",
   },
   {
-    image: "interior.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/meeting-space.png",
     label: "Summit room",
     caption: "Meeting space",
   },
   {
-    image: "grounds.jpg",
+    image: "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/clemson.jpg",
     label: "Lakeside grounds",
     caption: "Clemson University",
   },

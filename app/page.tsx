@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { BrandMapSection } from "@/components/BrandMapSection";
 import { HeroVisual } from "@/components/HeroVisual";
 import { LogoRibbon } from "@/components/LogoRibbon";
 import { People } from "@/components/People";
-import { PhotoSlot } from "@/components/PhotoSlot";
+import { PhotoSlot, publicImage } from "@/components/PhotoSlot";
+import { ProblemCycle } from "@/components/ProblemCycle";
 import { Reveal } from "@/components/Reveal";
 import { getEventContent } from "@/lib/appsync";
+import { getBrandMap } from "@/lib/brand-map";
 import { audiences, differentiators, pillars, venueShots } from "@/lib/content";
 import { EVENT } from "@/lib/event";
 import { ribbonLogos } from "@/lib/ribbon";
@@ -41,7 +44,7 @@ const eventLd = {
 };
 
 export default async function HomePage() {
-  const { speakers, sponsors } = await getEventContent();
+  const [{ speakers, sponsors }, places] = await Promise.all([getEventContent(), getBrandMap()]);
 
   return (
     <>
@@ -90,26 +93,13 @@ export default async function HomePage() {
       </div>
 
       <section className="relative z-10 mx-auto w-full max-w-[82rem] pt-24 pb-10">
-        <div className="rounded-3xl bg-[#e8e6e2] px-8 py-10 shadow-[0_30px_70px_-36px_rgba(7,30,54,0.45)] sm:px-12 sm:py-12">
-          <Reveal>
-            <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-orange">From the Packaging School team</p>
-            <h2 className="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight text-balance text-deep sm:text-5xl">
-              Built for the packaging problem you already have.
-            </h2>
-            <p className="mt-4 max-w-[66%] text-xl leading-snug text-deep/75">
-              The Packaging School has produced the Automotive Packaging Summit, a sold-out event for the past 10 years. This one is for the Southeast: engineers, providers, and brand teams in the same room.
-            </p>
-          </Reveal>
-          <div className="mt-10 grid gap-px overflow-hidden rounded-3xl bg-navy/10 sm:grid-cols-2">
-            {differentiators.map((item, index) => (
-              <Reveal key={item.title} delay={index * 0.05} className="bg-paper p-7">
-                <p className="font-display text-sm font-bold text-orange">0{index + 1}</p>
-                <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight">{item.title}</h3>
-                <p className="mt-2 leading-snug text-deep/75">{item.body}</p>
-              </Reveal>
-            ))}
-          </div>
-        </div>
+        <ProblemCycle
+          steps={differentiators.map((item) => ({
+            title: item.title,
+            body: item.body,
+            image: publicImage("problem", item.image),
+          }))}
+        />
       </section>
 
       <section className="relative z-10 bg-navy text-cream">
@@ -124,13 +114,25 @@ export default async function HomePage() {
             {audiences.map((item) => (
               <Reveal key={item.kicker}>
                 <article className="h-full border-t border-gold/50 pt-5">
-                  <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-orange">{item.kicker}</p>
+                  <p className="font-display text-xs font-semibold uppercase tracking-[0.18em] text-gold">{item.kicker}</p>
                   <h3 className="mt-3 font-display text-2xl font-semibold tracking-tight">{item.title}</h3>
                   <p className="mt-3 leading-snug text-cream/75">{item.body}</p>
                 </article>
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="relative z-10 bg-cream-deep">
+        <div className="mx-auto grid max-w-6xl gap-6 px-5 py-24 md:grid-cols-3">
+          {pillars.map((item) => (
+            <Reveal key={item.title}>
+              <PhotoSlot file={item.image} label={item.label} />
+              <h3 className="mt-4 font-display text-2xl font-semibold tracking-tight">{item.title}</h3>
+              <p className="mt-2 text-deep/75">{item.body}</p>
+            </Reveal>
+          ))}
         </div>
       </section>
 
@@ -156,32 +158,43 @@ export default async function HomePage() {
         </Link>
       </section>
 
-      <section className="bg-cream-deep">
-        <div className="mx-auto grid max-w-6xl gap-6 px-5 py-24 md:grid-cols-3">
-          {pillars.map((item) => (
-            <Reveal key={item.title}>
-              <PhotoSlot file={item.image} label={item.label} />
-              <h3 className="mt-4 font-display text-2xl font-semibold tracking-tight">{item.title}</h3>
-              <p className="mt-2 text-deep/75">{item.body}</p>
-            </Reveal>
-          ))}
+      <People speakers={speakers} sponsors={sponsors} />
+
+      <section className="bg-navy text-cream">
+        <div className="mx-auto max-w-6xl px-5 py-24">
+          <Reveal>
+            <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+              Regional CPG/Brand Map for Southeast
+            </p>
+            <h2 className="mt-3 max-w-3xl font-display text-4xl font-semibold tracking-tight">
+              A hotspot for packaging.
+            </h2>
+            <p className="mt-4 max-w-2xl leading-snug text-cream/75">
+              Consumer packaged goods brands and the plants behind them are concentrated across the Southeast. Don&apos;t see your company?{" "}
+              <Link href="/register" className="font-display font-semibold text-cream underline decoration-orange decoration-2 underline-offset-4">
+                Register now
+              </Link>{" "}
+              to get involved.
+            </p>
+          </Reveal>
+          <BrandMapSection places={places} />
         </div>
       </section>
 
-      <People speakers={speakers} sponsors={sponsors} />
-
-      <section className="mx-auto grid max-w-6xl items-center gap-8 px-5 py-16 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="mx-auto max-w-6xl px-5 py-16">
         <Reveal>
-          <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-orange">The place</p>
-          <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight">Madren Conference Center at Clemson University.</h2>
-          <p className="mt-4 leading-snug text-deep/75">
-            {EVENT.address}, {EVENT.city}. The James F. Martin Inn is on site. A hotel block has not been announced yet.
-          </p>
-          <Link href="/travel" className={`${buttonClass} mt-6`}>
-            Travel details
-          </Link>
+          <div className="max-w-2xl">
+            <p className="font-display text-xs font-semibold uppercase tracking-[0.2em] text-orange">The place</p>
+            <h2 className="mt-3 font-display text-4xl font-semibold tracking-tight">Madren Conference Center at Clemson University.</h2>
+            <p className="mt-4 leading-snug text-deep/75">
+              {EVENT.address}, {EVENT.city}. The James F. Martin Inn is on site. A hotel block has not been announced yet.
+            </p>
+            <Link href="/travel" className={`${buttonClass} mt-6`}>
+              Travel details
+            </Link>
+          </div>
         </Reveal>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="mt-10 grid gap-4 sm:grid-cols-3">
           {venueShots.map((shot) => (
             <PhotoSlot key={shot.image} file={shot.image} label={shot.label} caption={shot.caption} />
           ))}

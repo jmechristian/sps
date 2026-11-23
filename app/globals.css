@@ -39,6 +39,18 @@ body {
   margin-top: 0.25rem;
 }
 
+.brand-map-popup .mapboxgl-popup-content {
+  border-radius: 16px;
+  padding: 12px 14px 14px;
+  font-family: var(--font-sans);
+}
+
+.brand-map-popup .mapboxgl-popup-close-button {
+  font-size: 18px;
+  padding: 2px 8px;
+  color: #071e36;
+}
+
 ::selection {
   background: #e54926;
   color: #fff;

@@ -3,8 +3,13 @@ import path from "node:path";
 import Image from "next/image";
 
 export function venueImage(file: string) {
-  const full = path.join(process.cwd(), "public/venue", file);
-  return fs.existsSync(full) ? `/venue/${file}` : null;
+  return publicImage("venue", file);
+}
+
+export function publicImage(folder: string, file: string) {
+  if (file.startsWith("https://") || file.startsWith("http://")) return file;
+  const full = path.join(process.cwd(), "public", folder, file);
+  return fs.existsSync(full) ? `/${folder}/${file}` : null;
 }
 
 export function PhotoSlot({
