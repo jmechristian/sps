@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { sendRegistrationEmail } from "@/lib/registration-email";
 import { createRegistration, registrationInput } from "@/lib/registrants";
 
 export async function POST(request: Request) {
@@ -15,6 +16,11 @@ export async function POST(request: Request) {
   try {
     const result = await createRegistration(input);
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
+    try {
+      await sendRegistrationEmail(input, result.id, new URL(request.url).origin);
+    } catch (error) {
+      console.error("SPS registration email failed", error);
+    }
     return NextResponse.json({ id: result.id });
   } catch (error) {
     console.error("SPS registration failed", error);

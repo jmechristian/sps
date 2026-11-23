@@ -11,10 +11,6 @@ function escapeHtml(value: string) {
 export async function sendInterestEmail(subject: string, lines: Array<[string, string]>) {
   const accessKeyId = process.env.AWSACCESSKEYID;
   const secretAccessKey = process.env.AWSSECRETACCESSKEY;
-  if (!accessKeyId || !secretAccessKey) {
-    throw new Error("Email is not configured.");
-  }
-
   const from = process.env.SES_FROM_ADDRESS || "info@packagingschool.com";
   const to = process.env.SES_TO_ADDRESS || "info@packagingschool.com";
   const reply = lines.find(([label]) => label.toLowerCase() === "email")?.[1];
@@ -28,7 +24,7 @@ export async function sendInterestEmail(subject: string, lines: Array<[string, s
 
   const client = new SESClient({
     region: process.env.NEXT_PUBLIC_AWS_APPSYNC_REGION || "us-east-1",
-    credentials: { accessKeyId, secretAccessKey },
+    credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
   });
 
   await client.send(

@@ -578,7 +578,7 @@ function Confirmation({
         <div>
           <h2 className="font-display text-3xl font-semibold tracking-tight md:text-4xl">Registration complete</h2>
           <p className="mt-2 font-display text-xs font-semibold uppercase tracking-[0.16em] text-gold">Southeastern Packaging Summit · April 19–20, 2027</p>
-          <p className="mt-3 max-w-xl text-cream/80">Your registration is confirmed. The receipt is below, and your dashboard has the same details.</p>
+          <p className="mt-3 max-w-xl text-cream/80">A confirmation email will be sent shortly. The receipt is below, and your dashboard has the same details.</p>
         </div>
         <div className="flex w-full max-w-xs flex-col gap-3">
           <Link href={`/registrants/${registrantId}`} className="rounded-full bg-orange px-5 py-3 text-center font-display text-sm font-semibold text-white hover:bg-orange-deep">
