@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Montserrat, Raleway } from "next/font/google";
 import { Footer } from "@/components/Footer";
-import { Header } from "@/components/Header";
+import { Header, HeaderFallback } from "@/components/Header";
 import "./globals.css";
 
 const raleway = Raleway({
@@ -29,7 +30,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${raleway.variable} ${montserrat.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <Header />
+        <Suspense fallback={<HeaderFallback />}>
+          <Header />
+        </Suspense>
         <main className="flex-1">{children}</main>
         <Footer />
       </body>

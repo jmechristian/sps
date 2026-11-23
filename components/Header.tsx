@@ -17,7 +17,22 @@ const links = [
 export function Header() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  return <HeaderView pathname={pathname} open={open} setOpen={setOpen} />;
+}
 
+export function HeaderFallback() {
+  return <HeaderView pathname="" open={false} setOpen={() => {}} />;
+}
+
+function HeaderView({
+  pathname,
+  open,
+  setOpen,
+}: {
+  pathname: string;
+  open: boolean;
+  setOpen: (value: boolean | ((value: boolean) => boolean)) => void;
+}) {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-deep/90 text-cream backdrop-blur-md">
       <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-5">
