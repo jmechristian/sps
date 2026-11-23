@@ -11,6 +11,7 @@ const DARK = "#111827";
 const MUTED = "#6b7280";
 
 const font = { fontFamily: "Helvetica Neue, Helvetica, Arial, sans-serif" };
+const HEADER_BG = "https://autopacksummitapp94b14feadba64f23aff0ed8deae77b99bc6-dev.s3.us-east-1.amazonaws.com/public/email-header.png";
 
 export type RegistrationEmailProps = {
   firstName: string;
@@ -66,7 +67,17 @@ export function RegistrationEmail({
           {trackingUrl ? <Img src={trackingUrl} width="1" height="1" alt="" style={{ display: "none" }} /> : null}
 
           <Section style={{ backgroundColor: GOLD, height: "6px", lineHeight: "6px", fontSize: "0" }}>&nbsp;</Section>
-          <Section style={{ backgroundColor: DEEP, padding: "28px 32px 32px", textAlign: "center" }}>
+          <Section
+            style={{
+              backgroundColor: DEEP,
+              backgroundImage: `url(${HEADER_BG})`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+              backgroundSize: "cover",
+              padding: "28px 32px 32px",
+              textAlign: "center",
+            }}
+          >
             <Img src={logoUrl} width="56" height="60" alt="Southeastern Packaging Summit" style={{ display: "block", margin: "0 auto 16px" }} />
             <Text style={{ margin: "0 0 10px", fontSize: "12px", fontWeight: 700, letterSpacing: "2px", textTransform: "uppercase", color: GOLD, ...font }}>
               The Packaging School
