@@ -341,12 +341,6 @@ export function RegisterWizard() {
                 onChange={(value) => update("opportunity", value)}
               />
             )}
-            <div className="rounded-2xl bg-cream px-4 py-4 md:col-span-2">
-              <p className="text-deep">Speaker registration stays off this form.</p>
-              <Link href="/speak" className="mt-2 inline-block font-display text-sm font-semibold text-orange hover:text-orange-deep">
-                Send speaker interest to the Packaging School
-              </Link>
-            </div>
           </div>
         )}
 

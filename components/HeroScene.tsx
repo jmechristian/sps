@@ -19,11 +19,12 @@ import {
   MeshBasicMaterial,
   PMREMGenerator,
   Scene,
+  ShaderMaterial,
   SphereGeometry,
   SpotLight,
   Vector3,
 } from "three";
-import type { LineBasicMaterial, MeshStandardMaterial, Object3D, PointsMaterial } from "three";
+import type { LineBasicMaterial, MeshStandardMaterial, Object3D } from "three";
 
 const SLIDE = 0.95;
 const DRAW = 2.6;
@@ -386,6 +387,9 @@ function Pack() {
     const pointGeom = new BufferGeometry();
     const lineGeom = new BufferGeometry();
     pointGeom.setAttribute("position", new BufferAttribute(new Float32Array(POINT_COUNT * 3), 3).setUsage(DynamicDrawUsage));
+    const seeds = new Float32Array(POINT_COUNT);
+    for (let i = 0; i < POINT_COUNT; i += 1) seeds[i] = Math.random();
+    pointGeom.setAttribute("seed", new BufferAttribute(seeds, 1));
     lineGeom.setAttribute("position", new BufferAttribute(new Float32Array(LINE_FLOATS), 3).setUsage(DynamicDrawUsage));
     lineGeom.setAttribute("color", new BufferAttribute(new Float32Array(LINE_FLOATS), 3).setUsage(DynamicDrawUsage));
     pointGeom.setDrawRange(0, 0);
@@ -393,7 +397,45 @@ function Pack() {
     return { pointGeom, lineGeom };
   }, []);
   const group = useRef<Group>(null);
-  const pointsMat = useRef<PointsMaterial>(null);
+  const shell = useRef<Group>(null);
+  const pointMat = useMemo(
+    () =>
+      new ShaderMaterial({
+        transparent: true,
+        depthTest: true,
+        depthWrite: false,
+        toneMapped: false,
+        uniforms: {
+          uTime: { value: 0 },
+          uOpacity: { value: 0 },
+          uSize: { value: 2.6 },
+        },
+        vertexShader: `
+          attribute float seed;
+          uniform float uTime;
+          uniform float uSize;
+          varying float vSpark;
+          void main() {
+            float cycle = 2.6 + seed * 3.4;
+            float t = fract(uTime / cycle + seed);
+            float spark = step(0.64, seed) * smoothstep(0.0, 0.012, t) * (1.0 - smoothstep(0.018, 0.055, t));
+            vSpark = spark;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = uSize * (1.0 + spark * 2.6);
+          }
+        `,
+        fragmentShader: `
+          varying float vSpark;
+          uniform float uOpacity;
+          void main() {
+            vec3 base = vec3(0.969, 0.957, 0.937);
+            vec3 hot = vec3(1.0, 0.9, 0.55);
+            gl_FragColor = vec4(mix(base, hot, vSpark), uOpacity * (0.82 + vSpark));
+          }
+        `,
+      }),
+    [],
+  );
   const linesMat = useRef<LineBasicMaterial>(null);
   const shown = useRef(-1);
   const started = useRef(-1);
@@ -402,6 +444,7 @@ function Pack() {
     return () => {
       buffers.pointGeom.dispose();
       buffers.lineGeom.dispose();
+      pointMat.dispose();
     };
   }, [buffers]);
 
@@ -483,8 +526,13 @@ function Pack() {
     const shownPoints = Math.floor(wrap * model.pointCount);
     buffers.pointGeom.setDrawRange(0, shownPoints);
     buffers.lineGeom.setDrawRange(0, model.segCountAt[shownPoints] * 2);
-    if (pointsMat.current) pointsMat.current.opacity = scan * 0.95;
-    if (linesMat.current) linesMat.current.opacity = scan * 0.92;
+    const breath = Math.sin(time * 2.35) * 0.72 + Math.sin(time * 1.1) * 0.28;
+    const glow = 0.5 + breath * 0.5;
+    if (shell.current) shell.current.scale.setScalar(1 + breath * 0.034 * scan);
+    pointMat.uniforms.uTime.value = time;
+    pointMat.uniforms.uOpacity.value = scan * (0.62 + glow * 0.38);
+    pointMat.uniforms.uSize.value = 2.35 + glow * 0.7;
+    if (linesMat.current) linesMat.current.opacity = scan * (0.55 + glow * 0.45);
   });
 
   return (
@@ -492,12 +540,12 @@ function Pack() {
       {models.map((model, index) => (
         <primitive key={MODELS[index]} object={model.object} />
       ))}
-      <points geometry={buffers.pointGeom} frustumCulled={false} renderOrder={2}>
-        <pointsMaterial ref={pointsMat} color="#f7f4ef" size={2.6} sizeAttenuation={false} transparent opacity={0} depthTest depthWrite={false} toneMapped={false} />
-      </points>
-      <lineSegments geometry={buffers.lineGeom} frustumCulled={false} renderOrder={2}>
-        <lineBasicMaterial ref={linesMat} vertexColors transparent opacity={0} blending={AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
-      </lineSegments>
+      <group ref={shell}>
+        <points geometry={buffers.pointGeom} material={pointMat} frustumCulled={false} renderOrder={2} />
+        <lineSegments geometry={buffers.lineGeom} frustumCulled={false} renderOrder={2}>
+          <lineBasicMaterial ref={linesMat} vertexColors transparent opacity={0} blending={AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
+        </lineSegments>
+      </group>
     </group>
   );
 }
