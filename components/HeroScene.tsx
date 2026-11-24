@@ -416,9 +416,10 @@ function Pack() {
           uniform float uSize;
           varying float vSpark;
           void main() {
-            float cycle = 2.6 + seed * 3.4;
-            float t = fract(uTime / cycle + seed);
-            float spark = step(0.64, seed) * smoothstep(0.0, 0.012, t) * (1.0 - smoothstep(0.018, 0.055, t));
+            float phase = fract(seed * 17.0);
+            float rate = 0.55 + fract(seed * 7.13) * 0.9;
+            float wave = fract(uTime * rate + phase);
+            float spark = step(0.7, fract(seed * 3.1)) * smoothstep(0.0, 0.02, wave) * (1.0 - smoothstep(0.03, 0.1, wave));
             vSpark = spark;
             gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
             gl_PointSize = uSize * (1.0 + spark * 2.6);
