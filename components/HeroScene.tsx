@@ -30,9 +30,12 @@ const DRAW = 2.6;
 const HOLD = 1;
 const FADE = 0.65;
 const TARGET = 2.2;
-const POINT_COUNT = 340;
+const RINGS = 12;
+const AROUND = 28;
+const POINT_COUNT = RINGS * AROUND;
 const SCAN_GAP = 0.22;
-const LINE_FLOATS = POINT_COUNT * 24;
+const SEGMENT_COUNT = RINGS * AROUND + (RINGS - 1) * AROUND;
+const LINE_FLOATS = SEGMENT_COUNT * 6;
 const FACE = 0.58;
 
 const MODELS = [
@@ -47,6 +50,12 @@ const MODELS = [
   "/light_bulb.glb",
 ] as const;
 
+const FACE_YAW: Partial<Record<(typeof MODELS)[number], number>> = {
+  "/9v_battery.glb": -Math.PI / 2,
+  "/coffee_pack.glb": Math.PI / 2,
+  "/haier_refrigerator.glb": Math.PI,
+};
+
 type Prepared = {
   object: Group;
   positions: Float32Array;
@@ -54,6 +63,7 @@ type Prepared = {
   linePositions: Float32Array;
   lineColors: Float32Array;
   segmentCount: number;
+  segCountAt: Int32Array;
 };
 
 const _box = new Box3();
@@ -70,6 +80,35 @@ function setModelOpacity(object: Object3D, opacity: number) {
       material.depthWrite = opacity >= 0.99;
     }
   });
+}
+
+function writeSeg(
+  linePositions: Float32Array,
+  lineColors: Float32Array,
+  positions: Float32Array,
+  total: { count: number },
+  a: number,
+  b: number,
+) {
+  const cursor = total.count * 6;
+  linePositions[cursor] = positions[a * 3];
+  linePositions[cursor + 1] = positions[a * 3 + 1];
+  linePositions[cursor + 2] = positions[a * 3 + 2];
+  linePositions[cursor + 3] = positions[b * 3];
+  linePositions[cursor + 4] = positions[b * 3 + 1];
+  linePositions[cursor + 5] = positions[b * 3 + 2];
+  const tone = 0.82;
+  const scale = 0.35 + tone * 0.65;
+  const red = (0.9 + tone * 0.06) * scale;
+  const green = (0.29 + tone * 0.38) * scale;
+  const blue = (0.15 - tone * 0.12) * scale;
+  lineColors[cursor] = red;
+  lineColors[cursor + 1] = green;
+  lineColors[cursor + 2] = blue;
+  lineColors[cursor + 3] = red;
+  lineColors[cursor + 4] = green;
+  lineColors[cursor + 5] = blue;
+  total.count = total.count + 1;
 }
 
 function smooth(value: number) {
@@ -136,6 +175,7 @@ function sealOpenEnds(wrapper: Group) {
     const lid = material.clone();
     lid.normalMap = null;
     const disc = new Mesh(new CircleGeometry(radius, 40), lid);
+    disc.renderOrder = 1;
     disc.castShadow = false;
     const position = [...center];
     position[long] = cap.end - outward * length * 0.012;
@@ -160,8 +200,9 @@ function prepare(source: Object3D, src: string) {
   const drop: Object3D[] = [];
   root.traverse((obj) => {
     const node = obj as Mesh;
-    if (node.isMesh) {
-      node.castShadow = false;
+      if (node.isMesh) {
+        node.castShadow = false;
+        node.renderOrder = 1;
       const source = node.material;
       const list = Array.isArray(source) ? source : [source];
       const cloned = list.map((material) => {
@@ -181,9 +222,18 @@ function prepare(source: Object3D, src: string) {
             standard.metalness = 0.5;
             standard.roughness = Math.max(standard.roughness, 0.38);
           }
+          if (src.endsWith("/9v_battery.glb") && standard.metalnessMap) {
+            standard.metalness = 0.12;
+            standard.roughness = Math.max(standard.roughness, 0.55);
+            standard.envMapIntensity = 0.22;
+            standard.aoMapIntensity = 0.15;
+          }
           if (src.endsWith("/haier_refrigerator.glb") && standard.metalnessMap) {
-            standard.metalness = 0.32;
-            standard.envMapIntensity = 0.4;
+            standard.metalness = 0.05;
+            standard.color.multiplyScalar(1.65);
+            standard.roughness = Math.max(standard.roughness, 0.62);
+            standard.envMapIntensity = 0.16;
+            standard.aoMapIntensity = 0.1;
           }
           if (src.endsWith("/light_bulb.glb") && standard.name === "glass") {
             standard.metalness = 0.05;
@@ -224,6 +274,11 @@ function prepare(source: Object3D, src: string) {
   wrapper.updateMatrixWorld(true);
   sealOpenEnds(wrapper);
   presentFace(wrapper);
+  const turn = FACE_YAW[src as (typeof MODELS)[number]];
+  if (turn) {
+    wrapper.rotateY(turn);
+    wrapper.updateMatrixWorld(true);
+  }
 
   const coords: number[] = [];
   wrapper.traverse((obj) => {
@@ -247,98 +302,43 @@ function prepare(source: Object3D, src: string) {
   const cy = _center.y;
   const cz = _center.z;
   const positions = new Float32Array(POINT_COUNT * 3);
-  for (let i = 0; i < POINT_COUNT; i += 1) {
-    const y = 1 - (i / (POINT_COUNT - 1)) * 2;
-    const ring = Math.sqrt(Math.max(0, 1 - y * y));
-    const theta = i * Math.PI * (3 - Math.sqrt(5));
-    const dx = Math.cos(theta) * ring;
-    const dy = y;
-    const dz = Math.sin(theta) * ring;
-    let support = -Infinity;
-    for (let s = 0; s < sampleCount; s += 1) {
-      const offset = s * 3;
-      const projection =
-        (samples[offset] - cx) * dx + (samples[offset + 1] - cy) * dy + (samples[offset + 2] - cz) * dz;
-      if (projection > support) support = projection;
+  for (let ring = 0; ring < RINGS; ring += 1) {
+    const y = -1 + ((ring + 0.5) / RINGS) * 2;
+    const radius = Math.sqrt(Math.max(0, 1 - y * y));
+    for (let step = 0; step < AROUND; step += 1) {
+      const i = ring * AROUND + step;
+      const theta = (step / AROUND) * Math.PI * 2;
+      const dx = Math.cos(theta) * radius;
+      const dy = y;
+      const dz = Math.sin(theta) * radius;
+      let support = -Infinity;
+      for (let s = 0; s < sampleCount; s += 1) {
+        const offset = s * 3;
+        const projection =
+          (samples[offset] - cx) * dx + (samples[offset + 1] - cy) * dy + (samples[offset + 2] - cz) * dz;
+        if (projection > support) support = projection;
+      }
+      const reach = (Number.isFinite(support) ? support : 1) + SCAN_GAP;
+      positions[i * 3] = cx + dx * reach;
+      positions[i * 3 + 1] = cy + dy * reach;
+      positions[i * 3 + 2] = cz + dz * reach;
     }
-    const reach = (Number.isFinite(support) ? support : 1) + SCAN_GAP;
-    positions[i * 3] = cx + dx * reach;
-    positions[i * 3 + 1] = cy + dy * reach;
-    positions[i * 3 + 2] = cz + dz * reach;
   }
 
   const pointCount = POINT_COUNT;
-  const nearest = new Float32Array(pointCount);
-  for (let i = 0; i < pointCount; i += 1) {
-    let min = Infinity;
-    for (let j = 0; j < pointCount; j += 1) {
-      if (i === j) continue;
-      const dx = positions[j * 3] - positions[i * 3];
-      const dy = positions[j * 3 + 1] - positions[i * 3 + 1];
-      const dz = positions[j * 3 + 2] - positions[i * 3 + 2];
-      const dist = dx * dx + dy * dy + dz * dz;
-      if (dist < min) min = dist;
-    }
-    nearest[i] = Math.sqrt(min);
-  }
-  const ordered = Array.from(nearest).sort((a, b) => a - b);
-  const spacing = ordered[Math.floor(ordered.length / 2)] || 0.3;
-  const limit = spacing * 1.85;
-  const limitSq = limit * limit;
-  const raw: { y: number; ax: number; ay: number; az: number; bx: number; by: number; bz: number; near: number }[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < pointCount; i += 1) {
-    const near: { j: number; dist: number }[] = [];
-    for (let j = 0; j < pointCount; j += 1) {
-      if (i === j) continue;
-      const dx = positions[j * 3] - positions[i * 3];
-      const dy = positions[j * 3 + 1] - positions[i * 3 + 1];
-      const dz = positions[j * 3 + 2] - positions[i * 3 + 2];
-      const dist = dx * dx + dy * dy + dz * dz;
-      if (dist > limitSq || dist < 1e-6) continue;
-      near.push({ j, dist });
-    }
-    near.sort((a, b) => a.dist - b.dist);
-    for (const candidate of near.slice(0, 4)) {
-      const a = Math.min(i, candidate.j);
-      const b = Math.max(i, candidate.j);
-      const key = `${a}-${b}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      raw.push({
-        y: positions[a * 3 + 1] + positions[b * 3 + 1],
-        ax: positions[a * 3],
-        ay: positions[a * 3 + 1],
-        az: positions[a * 3 + 2],
-        bx: positions[b * 3],
-        by: positions[b * 3 + 1],
-        bz: positions[b * 3 + 2],
-        near: 1 - candidate.dist / limitSq,
-      });
+  const linePositions = new Float32Array(LINE_FLOATS);
+  const lineColors = new Float32Array(LINE_FLOATS);
+  const segCountAt = new Int32Array(pointCount + 1);
+  const segmentTotal = { count: 0 };
+  for (let ring = 0; ring < RINGS; ring += 1) {
+    for (let step = 0; step < AROUND; step += 1) {
+      const i = ring * AROUND + step;
+      if (step > 0) writeSeg(linePositions, lineColors, positions, segmentTotal, i, i - 1);
+      if (step === AROUND - 1) writeSeg(linePositions, lineColors, positions, segmentTotal, i, ring * AROUND);
+      if (ring > 0) writeSeg(linePositions, lineColors, positions, segmentTotal, i, i - AROUND);
+      segCountAt[i + 1] = segmentTotal.count;
     }
   }
-  raw.sort((a, b) => a.y - b.y);
-  const linePositions = new Float32Array(raw.length * 6);
-  const lineColors = new Float32Array(raw.length * 6);
-  raw.forEach((segment, index) => {
-    const cursor = index * 6;
-    linePositions[cursor] = segment.ax;
-    linePositions[cursor + 1] = segment.ay;
-    linePositions[cursor + 2] = segment.az;
-    linePositions[cursor + 3] = segment.bx;
-    linePositions[cursor + 4] = segment.by;
-    linePositions[cursor + 5] = segment.bz;
-    const near = segment.near;
-    const r = (0.9 + near * 0.06) * (0.35 + near * 0.65);
-    const g = (0.29 + near * 0.38) * (0.35 + near * 0.65);
-    const b = (0.15 - near * 0.12) * (0.35 + near * 0.65);
-    lineColors[cursor] = r;
-    lineColors[cursor + 1] = g;
-    lineColors[cursor + 2] = b;
-    lineColors[cursor + 3] = r;
-    lineColors[cursor + 4] = g;
-    lineColors[cursor + 5] = b;
-  });
 
   const prepared: Prepared = {
     object: wrapper,
@@ -346,7 +346,8 @@ function prepare(source: Object3D, src: string) {
     pointCount,
     linePositions,
     lineColors,
-    segmentCount: raw.length,
+    segmentCount: segmentTotal.count,
+    segCountAt,
   };
   return prepared;
 }
@@ -446,7 +447,7 @@ function Pack() {
     if (group.current) {
       const travel = phase < SLIDE ? smooth(phase / SLIDE) : 1;
       const sway = phase < SLIDE ? 0 : Math.sin((phase - SLIDE) * 0.45) * 0.08;
-      const targetY = FACE + (1 - travel) * 0.7 + sway + state.pointer.x * 0.28;
+      const targetY = FACE + (1 - travel) * 0.22 + sway + state.pointer.x * 0.28;
       const targetX = 0.32 - state.pointer.y * 0.18;
       group.current.rotation.y += (targetY - group.current.rotation.y) * Math.min(1, delta * 4);
       group.current.rotation.x += (targetX - group.current.rotation.x) * Math.min(1, delta * 3);
@@ -479,22 +480,23 @@ function Pack() {
     }
 
     const model = models[index];
-    buffers.pointGeom.setDrawRange(0, model.pointCount);
-    buffers.lineGeom.setDrawRange(0, Math.floor(model.segmentCount * wrap) * 2);
-    if (pointsMat.current) pointsMat.current.opacity = smooth(Math.min(1, wrap / 0.2)) * scan * 0.95;
+    const shownPoints = Math.floor(wrap * model.pointCount);
+    buffers.pointGeom.setDrawRange(0, shownPoints);
+    buffers.lineGeom.setDrawRange(0, model.segCountAt[shownPoints] * 2);
+    if (pointsMat.current) pointsMat.current.opacity = scan * 0.95;
     if (linesMat.current) linesMat.current.opacity = scan * 0.92;
   });
 
   return (
-    <group ref={group} scale={1.05} rotation={[0.32, FACE + 0.7, 0]}>
+    <group ref={group} scale={1.05} rotation={[0.32, FACE + 0.22, 0]}>
       {models.map((model, index) => (
         <primitive key={MODELS[index]} object={model.object} />
       ))}
-      <points geometry={buffers.pointGeom} frustumCulled={false}>
-        <pointsMaterial ref={pointsMat} color="#f7f4ef" size={2.6} sizeAttenuation={false} transparent opacity={0} depthWrite={false} toneMapped={false} />
+      <points geometry={buffers.pointGeom} frustumCulled={false} renderOrder={2}>
+        <pointsMaterial ref={pointsMat} color="#f7f4ef" size={2.6} sizeAttenuation={false} transparent opacity={0} depthTest depthWrite={false} toneMapped={false} />
       </points>
-      <lineSegments geometry={buffers.lineGeom} frustumCulled={false}>
-        <lineBasicMaterial ref={linesMat} vertexColors transparent opacity={0} blending={AdditiveBlending} depthWrite={false} toneMapped={false} />
+      <lineSegments geometry={buffers.lineGeom} frustumCulled={false} renderOrder={2}>
+        <lineBasicMaterial ref={linesMat} vertexColors transparent opacity={0} blending={AdditiveBlending} depthTest depthWrite={false} toneMapped={false} />
       </lineSegments>
     </group>
   );
