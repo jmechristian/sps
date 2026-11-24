@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useRef } from "react";
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import {
@@ -20,6 +20,7 @@ import {
   PMREMGenerator,
   Scene,
   SphereGeometry,
+  SpotLight,
   Vector3,
 } from "three";
 import type { LineBasicMaterial, MeshStandardMaterial, Object3D, PointsMaterial } from "three";
@@ -32,11 +33,18 @@ const TARGET = 2.2;
 const POINT_COUNT = 340;
 const SCAN_GAP = 0.22;
 const LINE_FLOATS = POINT_COUNT * 24;
+const FACE = 0.58;
 
 const MODELS = [
   "/food_can_415g.glb",
   "/medicine_pill_bottle_with_label.glb",
   "/t-shirt.glb",
+  "/9v_battery.glb",
+  "/bike_tire.glb",
+  "/coffee_pack.glb",
+  "/drill.glb",
+  "/haier_refrigerator.glb",
+  "/light_bulb.glb",
 ] as const;
 
 type Prepared = {
@@ -117,7 +125,7 @@ function sealOpenEnds(wrapper: Group) {
       maxR = Math.max(maxR, radius);
       count += 1;
     }
-    if (count < 12 || minR < maxR * 0.5) return;
+    if (count < 12 || minR < maxR * 0.45 || minR > maxR * 0.82) return;
     caps.push({ end, minR, maxR });
   }
 
@@ -139,7 +147,15 @@ function sealOpenEnds(wrapper: Group) {
   }
 }
 
-function prepare(source: Object3D) {
+function presentFace(wrapper: Group) {
+  wrapper.updateMatrixWorld(true);
+  _box.setFromObject(wrapper);
+  const size = _box.getSize(_vertex);
+  if (size.x < size.z * 0.35) wrapper.rotateY(-Math.PI / 2);
+  wrapper.updateMatrixWorld(true);
+}
+
+function prepare(source: Object3D, src: string) {
   const root = source.clone(true);
   const drop: Object3D[] = [];
   root.traverse((obj) => {
@@ -150,11 +166,32 @@ function prepare(source: Object3D) {
       const list = Array.isArray(source) ? source : [source];
       const cloned = list.map((material) => {
         const next = material.clone();
+        const keepDepth = next.transparent;
         next.transparent = true;
         next.opacity = 1;
-        next.depthWrite = true;
+        next.depthWrite = !keepDepth;
         if ("envMapIntensity" in next) (next as MeshStandardMaterial).envMapIntensity *= 0.55;
         if ("metalness" in next) {
+          const standard = next as MeshStandardMaterial;
+          if (!standard.map && standard.metalness < 0.2 && standard.color.r < 0.03 && standard.color.g < 0.03 && standard.color.b < 0.03) {
+            standard.color.setRGB(0.28, 0.28, 0.29);
+            standard.roughness = Math.max(standard.roughness, 0.55);
+          }
+          if (!standard.metalnessMap && standard.metalness > 0.8) {
+            standard.metalness = 0.5;
+            standard.roughness = Math.max(standard.roughness, 0.38);
+          }
+          if (src.endsWith("/haier_refrigerator.glb") && standard.metalnessMap) {
+            standard.metalness = 0.32;
+            standard.envMapIntensity = 0.4;
+          }
+          if (src.endsWith("/light_bulb.glb") && standard.name === "glass") {
+            standard.metalness = 0.05;
+            standard.roughness = Math.max(standard.roughness, 0.12);
+            standard.envMapIntensity = 0.7;
+          }
+        }
+        if (src.endsWith("/food_can_415g.glb") && "metalness" in next) {
           const standard = next as MeshStandardMaterial;
           if (standard.metalnessMap || standard.metalness > 0.85) {
             standard.metalnessMap = null;
@@ -186,6 +223,7 @@ function prepare(source: Object3D) {
   wrapper.scale.setScalar(TARGET / maxDim);
   wrapper.updateMatrixWorld(true);
   sealOpenEnds(wrapper);
+  presentFace(wrapper);
 
   const coords: number[] = [];
   wrapper.traverse((obj) => {
@@ -342,7 +380,7 @@ function Studio() {
 
 function Pack() {
   const gltfs = useGLTF([...MODELS]);
-  const models = useMemo(() => gltfs.map((gltf) => prepare(gltf.scene)), [gltfs]);
+  const models = useMemo(() => gltfs.map((gltf, index) => prepare(gltf.scene, MODELS[index])), [gltfs]);
   const buffers = useMemo(() => {
     const pointGeom = new BufferGeometry();
     const lineGeom = new BufferGeometry();
@@ -357,6 +395,7 @@ function Pack() {
   const pointsMat = useRef<PointsMaterial>(null);
   const linesMat = useRef<LineBasicMaterial>(null);
   const shown = useRef(-1);
+  const started = useRef(-1);
 
   useEffect(() => {
     return () => {
@@ -365,8 +404,13 @@ function Pack() {
     };
   }, [buffers]);
 
+  useLayoutEffect(() => {
+    for (const model of models) setModelOpacity(model.object, 0);
+  }, [models]);
+
   useFrame((state, delta) => {
-    const time = state.clock.elapsedTime + SLIDE;
+    if (started.current < 0) started.current = state.clock.elapsedTime;
+    const time = state.clock.elapsedTime - started.current;
     const period = SLIDE + DRAW + HOLD + FADE + SLIDE;
     const phase = time % period;
     const index = Math.floor(time / period) % models.length;
@@ -400,9 +444,11 @@ function Pack() {
     }
 
     if (group.current) {
-      const targetY = time * 0.12 + state.pointer.x * 0.4;
+      const travel = phase < SLIDE ? smooth(phase / SLIDE) : 1;
+      const sway = phase < SLIDE ? 0 : Math.sin((phase - SLIDE) * 0.45) * 0.08;
+      const targetY = FACE + (1 - travel) * 0.7 + sway + state.pointer.x * 0.28;
       const targetX = 0.32 - state.pointer.y * 0.18;
-      group.current.rotation.y += (targetY - group.current.rotation.y) * Math.min(1, delta * 3);
+      group.current.rotation.y += (targetY - group.current.rotation.y) * Math.min(1, delta * 4);
       group.current.rotation.x += (targetX - group.current.rotation.x) * Math.min(1, delta * 3);
       const restX = state.size.width >= 1024 ? state.viewport.width * 0.18 : 0;
       group.current.position.x = restX + slide;
@@ -440,7 +486,7 @@ function Pack() {
   });
 
   return (
-    <group ref={group} scale={1.05} rotation={[0.32, 0.45, 0]}>
+    <group ref={group} scale={1.05} rotation={[0.32, FACE + 0.7, 0]}>
       {models.map((model, index) => (
         <primitive key={MODELS[index]} object={model.object} />
       ))}
@@ -458,6 +504,32 @@ MODELS.forEach((src) => {
   useGLTF.preload(src);
 });
 
+function HeroSpot() {
+  const light = useRef<SpotLight>(null);
+  const scene = useThree((state) => state.scene);
+  useLayoutEffect(() => {
+    const spot = light.current;
+    if (!spot) return;
+    spot.target.position.set(1.15, 0.35, 0);
+    scene.add(spot.target);
+    return () => {
+      scene.remove(spot.target);
+    };
+  }, [scene]);
+  return (
+    <spotLight
+      ref={light}
+      position={[2.6, 3.8, 3.4]}
+      angle={0.62}
+      penumbra={1}
+      intensity={18}
+      distance={12}
+      decay={2}
+      color="#fff4e4"
+    />
+  );
+}
+
 export default function HeroScene() {
   return (
     <Canvas camera={{ position: [4.35, 2.31, 4.97], fov: 46 }} dpr={[1, 1.6]} gl={{ alpha: true, antialias: true }}>
@@ -466,6 +538,7 @@ export default function HeroScene() {
         <ambientLight intensity={0.46} />
         <directionalLight position={[3.5, 4.5, 3]} intensity={0.9} color="#f7f4ef" />
         <directionalLight position={[-3, -1.5, -2]} intensity={0.18} color="#e54926" />
+        <HeroSpot />
         <Pack />
       </Suspense>
     </Canvas>
